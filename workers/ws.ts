@@ -1,97 +1,106 @@
 import { DurableObject } from "cloudflare:workers";
 
+interface User {
+	id: string;
+	name: string;
+}
+
 export class ChatServer extends DurableObject {
-	private userIds: Map<WebSocket, string>;
+	private users: Map<WebSocket, User>;
 
 	constructor(state: DurableObjectState, env: Env) {
 		super(state, env);
-		this.userIds = new Map();
+		this.users = new Map();
 	}
 
-	private getRandomUserId(): string {
+	private generateUUID(): string {
+		return crypto.randomUUID();
+	}
+
+	private getRandomName(): string {
 		const adjectives = [
-			"Happy",
-			"Clever",
-			"Swift",
-			"Brave",
-			"Gentle",
-			"Wise",
-			"Lucky",
-			"Kind",
-			"Cool",
-			"Calm",
-			"Bright",
-			"Smart",
-			"Quick",
-			"Noble",
-			"Sweet",
-			"Jolly",
-			"Merry",
-			"Proud",
-			"Eager",
-			"Witty",
-			"Sunny",
-			"Lively",
-			"Playful",
-			"Friendly",
-			"Peaceful",
-			"Cheerful",
-			"Graceful",
-			"Honest",
-			"Fancy",
-			"Charming",
-			"Daring",
-			"Energetic",
-			"Funny",
-			"Humble",
-			"Magical",
-			"Mighty",
-			"Patient",
-			"Royal",
-			"Shiny",
-			"Silly",
+			"快乐",
+			"聪明",
+			"勇敢",
+			"温柔",
+			"睿智",
+			"幸运",
+			"善良",
+			"酷酷",
+			"平静",
+			"明亮",
+			"机智",
+			"敏捷",
+			"高贵",
+			"甜美",
+			"欢乐",
+			"愉快",
+			"骄傲",
+			"热情",
+			"机灵",
+			"阳光",
+			"活泼",
+			"调皮",
+			"友好",
+			"安静",
+			"开心",
+			"优雅",
+			"诚实",
+			"可爱",
+			"迷人",
+			"大胆",
+			"活力",
+			"有趣",
+			"谦逊",
+			"神奇",
+			"强大",
+			"耐心",
+			"华丽",
+			"闪亮",
+			"俏皮",
+			"可爱",
 		];
 		const animals = [
-			"Cat",
-			"Dog",
-			"Fox",
-			"Bear",
-			"Owl",
-			"Wolf",
-			"Lion",
-			"Tiger",
-			"Panda",
-			"Rabbit",
-			"Deer",
-			"Duck",
-			"Bird",
-			"Fish",
-			"Seal",
-			"Dolphin",
-			"Penguin",
-			"Koala",
-			"Kangaroo",
-			"Elephant",
-			"Giraffe",
-			"Monkey",
-			"Zebra",
-			"Hedgehog",
-			"Squirrel",
-			"Hamster",
-			"Raccoon",
-			"Butterfly",
-			"Dragon",
-			"Unicorn",
-			"Whale",
-			"Otter",
-			"Pony",
-			"Alpaca",
-			"Beaver",
-			"Cheetah",
-			"Eagle",
-			"Falcon",
-			"Gazelle",
-			"Hippo",
+			"猫咪",
+			"狗狗",
+			"狐狸",
+			"熊熊",
+			"猫头鹰",
+			"狼",
+			"狮子",
+			"老虎",
+			"熊猫",
+			"兔子",
+			"小鹿",
+			"鸭子",
+			"小鸟",
+			"鱼儿",
+			"海豹",
+			"海豚",
+			"企鹅",
+			"考拉",
+			"袋鼠",
+			"大象",
+			"长颈鹿",
+			"猴子",
+			"斑马",
+			"刺猬",
+			"松鼠",
+			"仓鼠",
+			"浣熊",
+			"蝴蝶",
+			"龙",
+			"独角兽",
+			"鲸鱼",
+			"水獭",
+			"小马",
+			"羊驼",
+			"海狸",
+			"猎豹",
+			"老鹰",
+			"隼",
+			"羚羊",
+			"河马",
 		];
 		const randomAdjective =
 			adjectives[Math.floor(Math.random() * adjectives.length)];
@@ -111,16 +120,35 @@ export class ChatServer extends DurableObject {
 		}
 	}
 
-	private broadcastUserJoinLeave(userId: string, isJoining: boolean) {
+	private broadcastUserJoinLeave(user: User, isJoining: boolean) {
 		const message = isJoining
-			? `${userId} 加入了聊天室`
-			: `${userId} 离开了聊天室`;
+			? `${user.name} 加入了聊天室`
+			: `${user.name} 离开了聊天室`;
 		for (const client of this.ctx.getWebSockets()) {
 			client.send(
 				JSON.stringify({
 					type: "message",
 					content: message,
 					userId: "System",
+					userName: "系统消息",
+				}),
+			);
+		}
+	}
+
+	private broadcastNameChange(
+		userId: string,
+		oldName: string,
+		newName: string,
+	) {
+		const message = `${oldName} 改名为 ${newName}`;
+		for (const client of this.ctx.getWebSockets()) {
+			client.send(
+				JSON.stringify({
+					type: "message",
+					content: message,
+					userId: "System",
+					userName: "系统消息",
 				}),
 			);
 		}
@@ -133,25 +161,29 @@ export class ChatServer extends DurableObject {
 		// 检查 URL 中是否包含现有用户信息
 		const url = new URL(request.url);
 		const existingUserId = url.searchParams.get("userId");
+		const existingName = url.searchParams.get("name");
 
 		// 使用现有信息或生成新的
-		const userId = existingUserId || this.getRandomUserId();
-		this.userIds.set(server, userId);
+		const user: User = {
+			id: existingUserId || this.generateUUID(),
+			name: existingName || this.getRandomName(),
+		};
+		this.users.set(server, user);
 
 		this.ctx.acceptWebSocket(server);
 
-		// 发送用户的 ID 信息
+		// 发送用户的信息
 		server.send(
 			JSON.stringify({
 				type: "init",
-				userId: userId,
+				user,
 			}),
 		);
 
 		// 广播在线人数和加入消息
 		setTimeout(() => {
 			this.broadcastOnlineCount();
-			this.broadcastUserJoinLeave(userId, true);
+			this.broadcastUserJoinLeave(user, true);
 		}, 100);
 
 		return new Response(null, {
@@ -162,18 +194,50 @@ export class ChatServer extends DurableObject {
 
 	async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
 		const messageStr = message.toString();
-		const userId = this.userIds.get(ws) || "Anonymous";
+		const user = this.users.get(ws);
 
-		// 广播消息给所有连接的客户端，除了发送者
-		for (const client of this.ctx.getWebSockets()) {
-			if (client !== ws) {
-				client.send(
-					JSON.stringify({
-						type: "message",
-						content: messageStr,
-						userId: userId,
-					}),
-				);
+		if (!user) return;
+
+		try {
+			const data = JSON.parse(messageStr);
+
+			// 处理改名请求
+			if (data.type === "name_change") {
+				const oldName = user.name;
+				user.name = data.newName;
+				this.broadcastNameChange(user.id, oldName, user.name);
+				return;
+			}
+
+			// 处理普通消息
+			if (data.type === "message" && typeof data.content === "string") {
+				for (const client of this.ctx.getWebSockets()) {
+					if (client !== ws) {
+						client.send(
+							JSON.stringify({
+								type: "message",
+								content: data.content,
+								userId: user.id,
+								userName: user.name,
+							}),
+						);
+					}
+				}
+			}
+		} catch (e) {
+			// 如果不是有效的 JSON，作为普通文本消息处理
+			console.error("Failed to parse message:", e);
+			for (const client of this.ctx.getWebSockets()) {
+				if (client !== ws) {
+					client.send(
+						JSON.stringify({
+							type: "message",
+							content: messageStr,
+							userId: user.id,
+							userName: user.name,
+						}),
+					);
+				}
 			}
 		}
 	}
@@ -184,14 +248,13 @@ export class ChatServer extends DurableObject {
 		reason: string,
 		wasClean: boolean,
 	) {
-		const userId = this.userIds.get(ws);
-		this.userIds.delete(ws);
-		ws.close(code, "Durable Object is closing WebSocket");
+		const user = this.users.get(ws);
+		this.users.delete(ws);
 
 		// 广播用户离开消息和更新在线人数
-		if (userId) {
+		if (user) {
 			setTimeout(() => {
-				this.broadcastUserJoinLeave(userId, false);
+				this.broadcastUserJoinLeave(user, false);
 				this.broadcastOnlineCount();
 			}, 100);
 		}
