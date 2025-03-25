@@ -1,79 +1,74 @@
-# Welcome to React Router!
+# Anonymous Chat 匿名聊天室
 
-A modern, production-ready template for building full-stack React applications using React Router.
+一个基于 React 和 Cloudflare Workers 构建的实时匿名聊天应用。用户可以在无需注册的情况下快速加入聊天，系统会自动分配一个随机的有趣昵称。
 
-## Features
+## ✨ 特性
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+- 🎭 完全匿名 - 自动生成有趣的随机昵称
+- 🔄 实时通讯 - 基于 WebSocket 的即时消息传递
+- 👥 在线状态 - 实时显示在线人数
+- 🔄 身份切换 - 随时可以切换新的匿名身份
+- 🎨 精美界面 - 现代化的 UI 设计和流畅的用户体验
+- 🚀 高性能 - 基于 Cloudflare Workers 的分布式架构
+- 📱 响应式设计 - 完美支持移动端和桌面端
 
-## Getting Started
+## 🛠️ 技术栈
 
-### Installation
+- **前端框架**: React 19
+- **路由**: React Router 7
+- **状态管理**: Zustand
+- **样式**: TailwindCSS 4
+- **后端服务**: Cloudflare Workers + Durable Objects
+- **构建工具**: Vite
+- **开发语言**: TypeScript
+- **包管理器**: pnpm
 
-Install the dependencies:
+## 📸 项目截图
 
-```bash
-npm install
-```
+![项目截图](docs/image.png)
 
-### Development
+## ⚠️ 前置要求
 
-Start the development server with HMR:
+1. Node.js 18+
+2. pnpm 8+
+3. [Cloudflare Workers](https://workers.cloudflare.com/) 付费计划
+   - 本项目使用了 Durable Objects 功能
+   - 需要订阅 Workers Paid plan（每月 $5 起）
 
-```bash
-npm run dev
-```
+## 🚀 快速开始
 
-Your application will be available at `http://localhost:5173`.
-
-## Previewing the Production Build
-
-Preview the production build locally:
-
-```bash
-npm run preview
-```
-
-## Building for Production
-
-Create a production build:
+### 安装依赖
 
 ```bash
-npm run build
+pnpm install
 ```
 
-## Deployment
+### 本地开发
 
-Deployment is done using the Wrangler CLI.
-
-To build and deploy directly to production:
-
-```sh
-npm run deploy
+```bash
+pnpm dev
 ```
 
-To deploy a preview URL:
+访问 `http://localhost:5173` 即可看到应用。
 
-```sh
-npx wrangler versions upload
+### 生产环境构建
+
+```bash
+pnpm run build
 ```
 
-You can then promote a version to production after verification or roll it out progressively.
+### 部署
 
-```sh
-npx wrangler versions deploy
+1. 首先确保你有 Cloudflare 账号并已订阅 Workers Paid 计划
+2. 配置 Wrangler：
+```bash
+pnpm wrangler login
+```
+3. 部署到 Cloudflare Workers：
+```bash
+pnpm run deploy
 ```
 
-## Styling
+## 🤝 贡献
 
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
+欢迎提交 Issue 和 Pull Request！
