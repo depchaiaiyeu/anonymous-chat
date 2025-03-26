@@ -16,5 +16,12 @@
 			"tag": "v1",
 			"new_sqlite_classes": ["ChatServer"]
 		}
+	],
+	"rules": [
+		{
+			"type": "Text",
+			"globs": ["**/*.sql"],
+			"fallthrough": true
+		}
 	]
 }
