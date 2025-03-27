@@ -2,6 +2,8 @@ import { useChatStore, useWebSocketStore } from "~/stores/chat";
 import { useRef, useState, useEffect, useCallback } from "react";
 import type { ChatMessage } from "~/stores/chat";
 import { MessageType } from "../../drizzle/schema";
+import { format, isToday, isYesterday } from "date-fns";
+import { zhCN } from "date-fns/locale";
 
 // 打印MessageType的值，用于调试
 console.log("MessageType values:", MessageType);
@@ -66,6 +68,22 @@ export default function Home() {
 			nameInputRef.current.focus();
 		}
 	}, [isEditingName]);
+
+	// 格式化消息时间
+	const formatMessageTime = (timestamp: Date | number) => {
+		const date = new Date(timestamp);
+
+		if (isToday(date)) {
+			return `今天 ${format(date, "HH:mm", { locale: zhCN })}`;
+		}
+
+		if (isYesterday(date)) {
+			return `昨天 ${format(date, "HH:mm", { locale: zhCN })}`;
+		}
+
+		// 显示完整日期
+		return format(date, "yyyy-MM-dd HH:mm", { locale: zhCN });
+	};
 
 	function sendMessage(message: string) {
 		if (!message.trim() || !connection) return;
@@ -242,6 +260,7 @@ export default function Home() {
 		const messageId = message.id;
 		const messageType = message.messageType.toLowerCase();
 		const isImage = messageType === "image";
+		const messageTime = formatMessageTime(message.createdAt);
 
 		if (isSystem) {
 			return (
@@ -277,7 +296,10 @@ export default function Home() {
 								{userName[0]}
 							</div>
 							<div className="flex flex-col gap-1 min-w-0">
-								<span className="text-xs text-gray-500">{userName}</span>
+								<div className="flex items-center gap-2">
+									<span className="text-xs text-gray-500">{userName}</span>
+									<span className="text-xs text-gray-400">{messageTime}</span>
+								</div>
 								{isImage ? (
 									renderMessageContent(message)
 								) : (
@@ -291,7 +313,10 @@ export default function Home() {
 					{message.isOwn && (
 						<>
 							<div className="flex flex-col gap-1 items-end min-w-0">
-								<span className="text-xs text-blue-500">{userName}</span>
+								<div className="flex items-center gap-2">
+									<span className="text-xs text-gray-400">{messageTime}</span>
+									<span className="text-xs text-blue-500">{userName}</span>
+								</div>
 								{isImage ? (
 									renderMessageContent(message)
 								) : (

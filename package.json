@@ -12,6 +12,7 @@
 		"format": "biome format --write ."
 	},
 	"dependencies": {
+		"date-fns": "^4.1.0",
 		"drizzle-orm": "^0.41.0",
 		"isbot": "^5.1.25",
 		"react": "^19.0.0",
@@ -35,10 +36,6 @@
 		"wrangler": "^4.5.0"
 	},
 	"pnpm": {
-		"onlyBuiltDependencies": [
-			"@biomejs/biome",
-			"esbuild",
-			"workerd"
-		]
+		"onlyBuiltDependencies": ["@biomejs/biome", "esbuild", "workerd"]
 	}
 }
