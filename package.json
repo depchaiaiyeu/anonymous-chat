@@ -7,7 +7,7 @@
 		"deploy": "npm run build && wrangler deploy",
 		"dev": "react-router dev",
 		"preview": "vite preview",
-		"start": "wrangler dev",
+		"start": "wrangler dev --experimental-images-local-mode",
 		"typecheck": "wrangler types && react-router typegen && tsc -b",
 		"format": "biome format --write ."
 	},
@@ -21,20 +21,24 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
-		"@cloudflare/vite-plugin": "^0.1.15",
+		"@cloudflare/vite-plugin": "^0.1.17",
 		"@react-router/dev": "^7.4.0",
-		"@tailwindcss/vite": "^4.0.15",
-		"@types/node": "^22.13.13",
+		"@tailwindcss/vite": "^4.0.17",
+		"@types/node": "^22.13.14",
 		"@types/react": "^19.0.12",
 		"@types/react-dom": "^19.0.4",
 		"drizzle-kit": "^0.30.5",
-		"tailwindcss": "^4.0.15",
+		"tailwindcss": "^4.0.17",
 		"typescript": "^5.8.2",
 		"vite": "^6.2.3",
 		"vite-tsconfig-paths": "^5.1.4",
-		"wrangler": "^4.4.0"
+		"wrangler": "^4.5.0"
 	},
 	"pnpm": {
-		"onlyBuiltDependencies": ["@biomejs/biome", "esbuild"]
+		"onlyBuiltDependencies": [
+			"@biomejs/biome",
+			"esbuild",
+			"workerd"
+		]
 	}
 }

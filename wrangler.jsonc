@@ -23,5 +23,15 @@
 			"globs": ["**/*.sql"],
 			"fallthrough": true
 		}
-	]
+	],
+	"r2_buckets": [
+		{
+			"binding": "BUCKET",
+			"bucket_name": "anonymous-chat-media",
+			"preview_bucket_name": "anonymous-chat-media"
+		}
+	],
+	"images": {
+		"binding": "IMAGES"
+	}
 }

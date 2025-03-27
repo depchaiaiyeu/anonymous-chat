@@ -3,6 +3,9 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import type { ChatMessage } from "~/stores/chat";
 import { MessageType } from "../../drizzle/schema";
 
+// 打印MessageType的值，用于调试
+console.log("MessageType values:", MessageType);
+
 export async function clientLoader() {
 	try {
 		// 从 store 获取 WebSocket 实例和状态
@@ -29,13 +32,15 @@ export default function Home() {
 	const { connection, user, onlineCount, switchIdentity, changeName } =
 		useWebSocketStore();
 
-	const { messages, addMessage } = useChatStore();
+	const { messages, addMessage, addImageMessage } = useChatStore();
 
 	const [inputMessage, setInputMessage] = useState("");
 	const [isEditingName, setIsEditingName] = useState(false);
 	const [newName, setNewName] = useState("");
+	const [isUploading, setIsUploading] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const nameInputRef = useRef<HTMLInputElement>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [isConnected, setIsConnected] = useState(false);
 
 	const scrollToBottom = useCallback(() => {
@@ -92,13 +97,91 @@ export default function Home() {
 		}
 	}
 
+	// 处理图片上传
+	async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+		if (!e.target.files || e.target.files.length === 0 || !connection) return;
+
+		try {
+			setIsUploading(true);
+
+			const file = e.target.files[0];
+			if (!file.type.startsWith("image/")) {
+				alert("请选择图片文件");
+				return;
+			}
+
+			// 创建表单数据
+			const formData = new FormData();
+			formData.append("image", file);
+
+			// 上传图片
+			const response = await fetch("/api/image", {
+				method: "POST",
+				body: formData,
+			});
+
+			if (!response.ok) {
+				throw new Error(`上传失败，状态码: ${response.status}`);
+			}
+
+			const result = (await response.json()) as {
+				success: boolean;
+				key: string;
+				url: string;
+				metadata: {
+					width: number;
+					height: number;
+					mimeType: string;
+					fileSize: number;
+				};
+				error?: string;
+			};
+
+			console.log("上传结果:", result); // 调试信息
+
+			if (result.success) {
+				// 确保URL是完整的绝对URL
+				const imageUrl = result.url.startsWith("http")
+					? result.url
+					: new URL(result.url, window.location.origin).href;
+
+				console.log("图片URL:", imageUrl); // 调试信息
+
+				// 发送图片消息
+				addImageMessage(imageUrl, result.metadata);
+			} else {
+				alert(`图片上传失败: ${result.error || "未知错误"}`);
+			}
+		} catch (error) {
+			console.error("上传图片时出错:", error);
+			alert("图片上传出错，请重试");
+		} finally {
+			setIsUploading(false);
+			// 清空文件选择器，以便可以上传相同的文件
+			if (fileInputRef.current) {
+				fileInputRef.current.value = "";
+			}
+		}
+	}
+
+	// 触发文件选择器打开
+	function openFileSelector() {
+		fileInputRef.current?.click();
+	}
+
 	// 渲染消息内容
 	function renderMessageContent(message: ChatMessage) {
+		console.log("渲染消息内容:", message.messageType, message);
+
+		// 确保小写字符串比较，因为MessageType.IMAGE是"image"而不是"IMAGE"
+		const messageType = message.messageType.toLowerCase();
+
 		// 正常消息类型处理
-		switch (message.messageType) {
-			case MessageType.TEXT:
+		switch (messageType) {
+			case "text": {
 				return <div className="break-words text-sm">{message.content}</div>;
-			case MessageType.IMAGE:
+			}
+			case "image": {
 				if (message.metadata) {
 					const imageMetadata = message.metadata as {
 						width: number;
@@ -108,27 +191,30 @@ export default function Home() {
 						thumbnailUrl?: string;
 					};
 					return (
-						<div>
-							<img
-								src={message.content}
-								alt="图片"
-								className="max-w-full rounded-lg max-h-80 object-contain"
-								style={{
-									width: imageMetadata.width > 300 ? 300 : imageMetadata.width,
-									height: "auto",
-								}}
-							/>
-						</div>
+						<img
+							src={message.content}
+							alt="图片"
+							className="rounded-md max-w-full max-h-80 object-contain"
+							style={{
+								maxWidth: "280px",
+								height: "auto",
+							}}
+						/>
 					);
 				}
 				return (
 					<img
 						src={message.content}
 						alt="图片"
-						className="max-w-full rounded-lg max-h-80 object-contain"
+						className="rounded-md max-w-full max-h-80 object-contain"
+						style={{
+							maxWidth: "280px",
+							height: "auto",
+						}}
 					/>
 				);
-			case MessageType.AUDIO:
+			}
+			case "audio": {
 				return (
 					<div>
 						<audio controls src={message.content} className="max-w-full">
@@ -137,15 +223,25 @@ export default function Home() {
 						</audio>
 					</div>
 				);
-			default:
-				return <div className="break-words text-sm">{message.content}</div>;
+			}
+			default: {
+				return (
+					<div className="break-words text-sm">
+						{message.content} (未知类型:{message.messageType})
+					</div>
+				);
+			}
 		}
 	}
 
 	// 渲染消息
 	function renderMessage(message: ChatMessage, index: number) {
+		console.log("渲染消息:", message.messageType, message);
+
 		const isSystem = message.userId === "System";
 		const messageId = message.id;
+		const messageType = message.messageType.toLowerCase();
+		const isImage = messageType === "image";
 
 		if (isSystem) {
 			return (
@@ -182,9 +278,13 @@ export default function Home() {
 							</div>
 							<div className="flex flex-col gap-1 min-w-0">
 								<span className="text-xs text-gray-500">{userName}</span>
-								<div className="px-4 py-2 rounded-2xl bg-gray-100 text-gray-700">
-									{renderMessageContent(message)}
-								</div>
+								{isImage ? (
+									renderMessageContent(message)
+								) : (
+									<div className="px-4 py-2 rounded-2xl bg-gray-100 text-gray-700">
+										{renderMessageContent(message)}
+									</div>
+								)}
 							</div>
 						</>
 					)}
@@ -192,9 +292,13 @@ export default function Home() {
 						<>
 							<div className="flex flex-col gap-1 items-end min-w-0">
 								<span className="text-xs text-blue-500">{userName}</span>
-								<div className="px-4 py-2 rounded-2xl bg-blue-500 text-white">
-									{renderMessageContent(message)}
-								</div>
+								{isImage ? (
+									renderMessageContent(message)
+								) : (
+									<div className="px-4 py-2 rounded-2xl bg-blue-500 text-white">
+										{renderMessageContent(message)}
+									</div>
+								)}
 							</div>
 							<div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-sm font-medium text-white">
 								{userName[0]}
@@ -287,6 +391,64 @@ export default function Home() {
 			<div className="bg-white/90 backdrop-blur-lg shadow-[0_-1px_3px_rgba(0,0,0,0.1)] sticky bottom-0">
 				<div className="max-w-4xl mx-auto p-4">
 					<div className="relative flex items-end gap-2 bg-white rounded-2xl p-2 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100">
+						{/* 隐藏的文件上传输入框 */}
+						<input
+							type="file"
+							ref={fileInputRef}
+							className="hidden"
+							accept="image/*"
+							onChange={handleImageUpload}
+						/>
+
+						{/* 图片上传按钮 */}
+						<button
+							type="button"
+							onClick={openFileSelector}
+							disabled={!isConnected || isUploading}
+							className="flex-shrink-0 p-2.5 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+							aria-label="上传图片"
+						>
+							{isUploading ? (
+								<svg
+									className="animate-spin w-5 h-5"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									aria-hidden="true"
+								>
+									<title>正在上传</title>
+									<circle
+										className="opacity-25"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										strokeWidth="4"
+									/>
+									<path
+										className="opacity-75"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									/>
+								</svg>
+							) : (
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="currentColor"
+									className="w-5 h-5"
+									role="img"
+								>
+									<title>图片上传</title>
+									<path
+										fillRule="evenodd"
+										d="M1.5 6a2.25 2.25 0 0 1 2.25-2.25h16.5A2.25 2.25 0 0 1 22.5 6v12a2.25 2.25 0 0 1-2.25 2.25H3.75A2.25 2.25 0 0 1 1.5 18V6ZM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0 0 21 18v-1.94l-2.69-2.689a1.5 1.5 0 0 0-2.12 0l-.88.879.97.97a.75.75 0 1 1-1.06 1.06l-5.16-5.159a1.5 1.5 0 0 0-2.12 0L3 16.061Zm10.125-7.81a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Z"
+										clipRule="evenodd"
+									/>
+								</svg>
+							)}
+						</button>
+
 						<textarea
 							value={inputMessage}
 							onChange={(e) => setInputMessage(e.target.value)}

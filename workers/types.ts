@@ -54,4 +54,11 @@ export type ClientToServerMessage = {
 	type: "message";
 	content: string;
 	messageType: keyof typeof MessageType;
+	metadata?: {
+		width?: number;
+		height?: number;
+		mimeType?: string;
+		fileSize?: number;
+		thumbnailUrl?: string;
+	}; // 元数据，用于图片等特殊消息类型
 };

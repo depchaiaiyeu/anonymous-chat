@@ -32,6 +32,16 @@ interface WebSocketStore {
 interface ChatStore {
 	messages: ChatMessage[];
 	addMessage: (content: string) => void;
+	addImageMessage: (
+		imageUrl: string,
+		metadata: {
+			width: number;
+			height: number;
+			mimeType: string;
+			fileSize: number;
+			thumbnailUrl?: string;
+		},
+	) => void;
 	addServerMessage: (
 		message: DbMessage,
 		sender?: { id: string; name: string },
@@ -138,12 +148,14 @@ export const useWebSocketStore = create<WebSocketStore>()(
 						ws.onmessage = (event) => {
 							try {
 								const data = JSON.parse(event.data);
+								console.log("收到WebSocket消息:", data);
 
 								switch (data.type) {
 									case "init":
 										store.setUser(data.user);
 										break;
 									case "message":
+										console.log("收到消息:", data.message);
 										chatStore.addServerMessage(data.message, data.sender);
 										break;
 									case "online_count":
@@ -292,10 +304,45 @@ export const useChatStore = create<ChatStore>()((set) => ({
 		}
 	},
 
+	addImageMessage: (
+		imageUrl: string,
+		metadata: {
+			width: number;
+			height: number;
+			mimeType: string;
+			fileSize: number;
+			thumbnailUrl?: string;
+		},
+	) => {
+		try {
+			const wsStore = useWebSocketStore.getState();
+			if (!wsStore.connection) return;
+
+			// 构造消息对象
+			const messageObj = {
+				type: "message",
+				content: imageUrl,
+				messageType: "IMAGE",
+				metadata: metadata,
+			};
+
+			// 调试日志
+			console.log("发送图片消息:", messageObj);
+
+			// 发送图片消息到服务器
+			wsStore.connection.send(JSON.stringify(messageObj));
+
+			// 实际消息会通过服务器返回添加，不在客户端添加
+		} catch (error) {
+			console.error("发送图片消息时出错:", error);
+		}
+	},
+
 	addServerMessage: (
 		message: DbMessage,
 		sender?: { id: string; name: string },
 	) => {
+		console.log("添加服务器消息:", message);
 		const wsStore = useWebSocketStore.getState();
 		const isOwn = message.userId === wsStore.user?.id;
 		// 优先使用sender中的用户名，其次使用自己的用户名（如果是自己的消息）

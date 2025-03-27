@@ -142,13 +142,15 @@ export class ChatServer extends DurableObject {
 		});
 	}
 
-	async webSocketMessage(ws: WebSocket, message: string) {
+	async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
 		const attachment = ws.deserializeAttachment();
 		if (!attachment) {
 			return;
 		}
 		const { userId } = attachment as { userId: string };
-
+		if (typeof message !== "string") {
+			return;
+		}
 		// 解析客户端消息
 		const clientMessage: ClientToServerMessage = JSON.parse(message);
 
@@ -163,12 +165,36 @@ export class ChatServer extends DurableObject {
 			return;
 		}
 
+		// 处理消息内容
+		let metadata = undefined;
+
+		// 如果是图片消息，包含图片元数据
+		if (clientMessage.messageType === "IMAGE" && clientMessage.metadata) {
+			// 确保元数据符合ImageMetadata类型的要求
+			const imageMetadata: schema.ImageMetadata = {
+				width: Number(clientMessage.metadata.width || 0),
+				height: Number(clientMessage.metadata.height || 0),
+				mimeType: String(clientMessage.metadata.mimeType || "image/webp"),
+				fileSize: Number(clientMessage.metadata.fileSize || 0),
+			};
+
+			// 可选的缩略图URL
+			if (clientMessage.metadata.thumbnailUrl) {
+				imageMetadata.thumbnailUrl = String(
+					clientMessage.metadata.thumbnailUrl,
+				);
+			}
+
+			metadata = imageMetadata;
+		}
+
 		const [msg] = await this.db
 			.insert(schema.messages)
 			.values({
 				userId,
 				messageType: clientMessage.messageType,
 				content: clientMessage.content,
+				metadata: metadata,
 			})
 			.returning();
 
